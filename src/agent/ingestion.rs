@@ -317,8 +317,9 @@ async fn delete_progress(pool: &SqlitePool, hash: &str) -> anyhow::Result<()> {
 
 // -- File-level tracking queries ------------------------------------------------
 
-/// Insert a file record when ingestion starts. Uses INSERT OR IGNORE so
-/// re-processing the same file after a restart is a no-op.
+/// Record that a file is now being processed. If a `queued` record already
+/// exists (from the upload handler), update it with chunk info and flip to
+/// `processing`. Otherwise insert a fresh `processing` record.
 async fn upsert_ingestion_file(
     pool: &SqlitePool,
     hash: &str,
@@ -328,8 +329,12 @@ async fn upsert_ingestion_file(
 ) -> anyhow::Result<()> {
     sqlx::query(
         r#"
-        INSERT OR IGNORE INTO ingestion_files (content_hash, filename, file_size, total_chunks, status)
+        INSERT INTO ingestion_files (content_hash, filename, file_size, total_chunks, status)
         VALUES (?, ?, ?, ?, 'processing')
+        ON CONFLICT(content_hash) DO UPDATE SET
+            total_chunks = excluded.total_chunks,
+            status = 'processing'
+        WHERE status = 'queued' OR status = 'processing'
         "#,
     )
     .bind(hash)
@@ -338,7 +343,7 @@ async fn upsert_ingestion_file(
     .bind(total_chunks)
     .execute(pool)
     .await
-    .context("failed to insert ingestion file record")?;
+    .context("failed to upsert ingestion file record")?;
 
     Ok(())
 }

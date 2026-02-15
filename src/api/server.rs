@@ -2295,6 +2295,26 @@ async fn upload_ingest_file(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
+        // Insert a queued record so the file appears in the UI immediately
+        if let Ok(content) = std::str::from_utf8(&data) {
+            let hash = crate::agent::ingestion::content_hash(content);
+            let pools = state.agent_pools.load();
+            if let Some(pool) = pools.get(&query.agent_id) {
+                let file_size = data.len() as i64;
+                let _ = sqlx::query(
+                    r#"
+                    INSERT OR IGNORE INTO ingestion_files (content_hash, filename, file_size, total_chunks, status)
+                    VALUES (?, ?, ?, 0, 'queued')
+                    "#,
+                )
+                .bind(&hash)
+                .bind(safe_name)
+                .bind(file_size)
+                .execute(pool)
+                .await;
+            }
+        }
+
         tracing::info!(
             agent_id = %query.agent_id,
             filename = %safe_name,

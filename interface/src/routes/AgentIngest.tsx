@@ -10,15 +10,16 @@ function formatFileSize(bytes: number): string {
 }
 
 function StatusBadge({ status }: { status: IngestFileInfo["status"] }) {
-	const styles = {
+	const styles: Record<string, string> = {
+		queued: "bg-amber-500/20 text-amber-400",
 		processing: "bg-blue-500/20 text-blue-400",
 		completed: "bg-green-500/20 text-green-400",
 		failed: "bg-red-500/20 text-red-400",
 	};
 	return (
-		<span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${styles[status]}`}>
-			{status === "processing" && (
-				<span className="mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-blue-400" />
+		<span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${styles[status] ?? styles.queued}`}>
+			{(status === "processing" || status === "queued") && (
+				<span className={`mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full ${status === "queued" ? "bg-amber-400" : "bg-blue-400"}`} />
 			)}
 			{status}
 		</span>
@@ -109,6 +110,7 @@ export function AgentIngest({ agentId }: AgentIngestProps) {
 	);
 
 	const files = data?.files ?? [];
+	const queued = files.filter((f) => f.status === "queued").length;
 	const processing = files.filter((f) => f.status === "processing").length;
 	const completed = files.filter((f) => f.status === "completed").length;
 	const failed = files.filter((f) => f.status === "failed").length;
@@ -124,6 +126,7 @@ export function AgentIngest({ agentId }: AgentIngestProps) {
 			{/* Stats bar */}
 			<div className="flex items-center gap-6 border-b border-app-line px-6 py-3">
 				<Stat label="total" value={files.length} color="text-accent" />
+				{queued > 0 && <Stat label="queued" value={queued} color="text-amber-400" />}
 				{processing > 0 && <Stat label="processing" value={processing} color="text-blue-400" />}
 				<Stat label="completed" value={completed} color="text-green-500" />
 				{failed > 0 && <Stat label="failed" value={failed} color="text-red-500" />}
@@ -249,7 +252,9 @@ function FileRow({
 				</div>
 				<div className="flex items-center gap-3 text-xs text-ink-faint">
 					<span>{formatFileSize(file.file_size)}</span>
-					<span>{file.total_chunks} chunk{file.total_chunks !== 1 ? "s" : ""}</span>
+					{file.total_chunks > 0 && (
+						<span>{file.total_chunks} chunk{file.total_chunks !== 1 ? "s" : ""}</span>
+					)}
 					<span>{formatTimeAgo(file.started_at)}</span>
 				</div>
 

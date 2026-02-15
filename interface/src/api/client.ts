@@ -629,7 +629,7 @@ export interface IngestFileInfo {
 	file_size: number;
 	total_chunks: number;
 	chunks_completed: number;
-	status: "processing" | "completed" | "failed";
+	status: "queued" | "processing" | "completed" | "failed";
 	started_at: string;
 	completed_at: string | null;
 }
